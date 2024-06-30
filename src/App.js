@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Button,
@@ -50,7 +50,7 @@ const App = () => {
   const [sliderConfig, setSliderConfig] = useState(config);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  const modelInputShape = [1, 3, 640, 640];
+  const modelInputShape = useMemo(() => [1, 3, 640, 640], []);
 
   const handleSliderConfigChange = (name, value) => {
     setSliderConfig((prevConfig) => ({
@@ -81,17 +81,34 @@ const App = () => {
     if (modelFiles.length > 0) setModel(modelFiles[0]);
   };
 
-  const loadModel = async (modelSource) => {
-    setLoading({ text: `Loading model`, progress: null });
-    let yolov8;
-    let nms;
+  const loadModel = useCallback(
+    async (modelSource) => {
+      setLoading({ text: `Loading model`, progress: null });
+      let yolov8;
+      let nms;
 
-    if (modelSource instanceof File) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const buffer = e.target.result;
-        yolov8 = await InferenceSession.create(buffer);
-        const arrBufNMS = await download(`${process.env.PUBLIC_URL}/model/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
+      if (modelSource instanceof File) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const buffer = e.target.result;
+          yolov8 = await InferenceSession.create(buffer);
+          const arrBufNMS = await download(`${process.env.PUBLIC_URL}/model/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
+          nms = await InferenceSession.create(arrBufNMS);
+
+          setLoading({ text: "Warming up model...", progress: null });
+          const tensor = new Tensor("float32", new Float32Array(modelInputShape.reduce((a, b) => a * b)), modelInputShape);
+          await yolov8.run({ images: tensor });
+
+          setSession({ net: yolov8, nms: nms });
+          setLoading(null);
+          setModel("Custom Model");
+        };
+        reader.readAsArrayBuffer(modelSource);
+      } else {
+        const baseModelURL = `${process.env.PUBLIC_URL}/model`;
+        const arrBufNet = await download(`${baseModelURL}/${modelSource}`, [`Loading ${modelSource}`, setLoading]);
+        yolov8 = await InferenceSession.create(arrBufNet);
+        const arrBufNMS = await download(`${baseModelURL}/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
         nms = await InferenceSession.create(arrBufNMS);
 
         setLoading({ text: "Warming up model...", progress: null });
@@ -100,25 +117,11 @@ const App = () => {
 
         setSession({ net: yolov8, nms: nms });
         setLoading(null);
-        setModel("Custom Model");
-      };
-      reader.readAsArrayBuffer(modelSource);
-    } else {
-      const baseModelURL = `${process.env.PUBLIC_URL}/model`;
-      const arrBufNet = await download(`${baseModelURL}/${modelSource}`, [`Loading ${modelSource}`, setLoading]);
-      yolov8 = await InferenceSession.create(arrBufNet);
-      const arrBufNMS = await download(`${baseModelURL}/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
-      nms = await InferenceSession.create(arrBufNMS);
-
-      setLoading({ text: "Warming up model...", progress: null });
-      const tensor = new Tensor("float32", new Float32Array(modelInputShape.reduce((a, b) => a * b)), modelInputShape);
-      await yolov8.run({ images: tensor });
-
-      setSession({ net: yolov8, nms: nms });
-      setLoading(null);
-      setModel(modelSource);
-    }
-  };
+        setModel(modelSource);
+      }
+    },
+    [modelInputShape],
+  );
 
   useEffect(() => {
     cv["onRuntimeInitialized"] = () => {
@@ -132,13 +135,13 @@ const App = () => {
       const canvas = canvasRef.current;
       detectImage(img, canvas, session, config.topk, config.iouThreshold, config.scoreThreshold, modelInputShape);
     }
-  }, [image, session, config, isImageLoaded]);
+  }, [image, session, config, isImageLoaded, modelInputShape]);
 
   useEffect(() => {
     if (model && modelChoice === "predefined") {
       loadModel(model);
     }
-  }, [model, modelChoice]);
+  }, [model, modelChoice, loadModel]);
 
   useEffect(() => {
     performDetection();
@@ -255,7 +258,7 @@ const App = () => {
               Serving: <code className="code">{model}</code>
             </Text>
 
-            <Box id="image-container" position="relative" display="inline-block" border="1px solid #ddd" borderRadius="10px" p={2}>
+            <Box id="image-container" position="relative" display="inline-block" p={2}>
               <Image
                 ref={imageRef}
                 src={image}
