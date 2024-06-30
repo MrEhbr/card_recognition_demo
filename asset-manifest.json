@@ -1,14 +1,14 @@
 {
   "files": {
-    "main.js": "/card_recognition_demo/static/js/main.0b06abad.js",
+    "main.js": "/card_recognition_demo/static/js/main.d0c6359f.js",
     "static/js/ort-wasm-simd.wasm": "/card_recognition_demo/static/js/ort-wasm-simd.wasm",
     "static/js/ort-wasm-simd-threaded.wasm": "/card_recognition_demo/static/js/ort-wasm-simd-threaded.wasm",
     "static/js/ort-wasm.wasm": "/card_recognition_demo/static/js/ort-wasm.wasm",
     "static/js/ort-wasm-threaded.wasm": "/card_recognition_demo/static/js/ort-wasm-threaded.wasm",
     "index.html": "/card_recognition_demo/index.html",
-    "main.0b06abad.js.map": "/card_recognition_demo/static/js/main.0b06abad.js.map"
+    "main.d0c6359f.js.map": "/card_recognition_demo/static/js/main.d0c6359f.js.map"
   },
   "entrypoints": [
-    "static/js/main.0b06abad.js"
+    "static/js/main.d0c6359f.js"
   ]
 }
