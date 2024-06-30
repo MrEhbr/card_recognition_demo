@@ -16,7 +16,7 @@
 	"scripts": {
 		"start": "node generateModelsList.js && craco start --static-serve-index",
 		"build": "node generateModelsList.js && craco build",
-		"deploy": "node generateModelsList.js && gh-pages -d build"
+		"deploy": "gh-pages -d build"
 	},
 	"eslintConfig": {
 		"extends": ["react-app", "react-app/jest"]

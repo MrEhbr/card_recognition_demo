@@ -249,11 +249,8 @@ const App = () => {
         <GridItem>
           <VStack spacing={4}>
             <Heading as="h1" size="xl">
-              YOLOv8 Object Detection App
+              Card recognition using YOLOv8
             </Heading>
-            <Text>
-              YOLOv8 object detection application live on browser powered by <code>onnxruntime-web</code>
-            </Text>
             <Text>
               Serving: <code className="code">{model}</code>
             </Text>
