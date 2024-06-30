@@ -25,8 +25,42 @@ import {
 } from "@chakra-ui/react";
 import cv from "@techstark/opencv-js";
 import { Tensor, InferenceSession } from "onnxruntime-web";
-import { detectImage } from "./utils/detect";
+import { detectImage, detectVideo, stopVideoDetection } from "./utils/detect";
 import { download } from "./utils/download";
+
+const debounce = (func, delay) => {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => func.apply(this, args), delay);
+  };
+};
+
+const Webcam = {
+  open: (videoRef) => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({
+          audio: false,
+          video: {
+            facingMode: "environment",
+          },
+        })
+        .then((stream) => {
+          videoRef.srcObject = stream;
+        });
+    } else alert("Can't open Webcam!");
+  },
+
+  close: (videoRef) => {
+    if (videoRef.srcObject) {
+      videoRef.srcObject.getTracks().forEach((track) => {
+        track.stop();
+      });
+      videoRef.srcObject = null;
+    }
+  },
+};
 
 const App = () => {
   const [session, setSession] = useState(null);
@@ -38,9 +72,9 @@ const App = () => {
   const inputImage = useRef(null);
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
+  const videoRef = useRef(null);
   const inputModel = useRef(null);
 
-  // Dynamic Configs
   const [config, setConfig] = useState({
     topk: 100,
     iouThreshold: 0.45,
@@ -49,6 +83,7 @@ const App = () => {
 
   const [sliderConfig, setSliderConfig] = useState(config);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isVideoRunning, setIsVideoRunning] = useState(false);
 
   const modelInputShape = useMemo(() => [1, 3, 640, 640], []);
 
@@ -59,9 +94,15 @@ const App = () => {
     }));
   };
 
-  const applySliderConfig = () => {
+  const applySliderConfig = debounce(() => {
     setConfig(sliderConfig);
-  };
+    if (isVideoRunning) {
+      stopVideoDetection();
+      startVideoDetection();
+    } else {
+      performDetection();
+    }
+  }, 300);
 
   const handleModelChange = (e) => {
     setModel(e.target.value);
@@ -74,9 +115,8 @@ const App = () => {
   };
 
   const fetchModels = async () => {
-    let modelFiles;
     const response = await fetch(`${process.env.PUBLIC_URL}/modelList.json`);
-    modelFiles = await response.json();
+    const modelFiles = await response.json();
     setModels(modelFiles);
     if (modelFiles.length > 0) setModel(modelFiles[0]);
   };
@@ -84,8 +124,7 @@ const App = () => {
   const loadModel = useCallback(
     async (modelSource) => {
       setLoading({ text: `Loading model`, progress: null });
-      let yolov8;
-      let nms;
+      let yolov8, nms;
 
       if (modelSource instanceof File) {
         const reader = new FileReader();
@@ -124,9 +163,7 @@ const App = () => {
   );
 
   useEffect(() => {
-    cv["onRuntimeInitialized"] = () => {
-      fetchModels();
-    };
+    cv["onRuntimeInitialized"] = fetchModels;
   }, []);
 
   const performDetection = useCallback(() => {
@@ -136,6 +173,14 @@ const App = () => {
       detectImage(img, canvas, session, config.topk, config.iouThreshold, config.scoreThreshold, modelInputShape);
     }
   }, [image, session, config, isImageLoaded, modelInputShape]);
+
+  const startVideoDetection = useCallback(() => {
+    if (videoRef.current && session) {
+      setIsVideoRunning(true);
+      const canvas = canvasRef.current;
+      detectVideo(videoRef.current, canvas, session, config.topk, config.iouThreshold, config.scoreThreshold, modelInputShape);
+    }
+  }, [session, config, modelInputShape]);
 
   useEffect(() => {
     if (model && modelChoice === "predefined") {
@@ -147,9 +192,62 @@ const App = () => {
     performDetection();
   }, [config, performDetection]);
 
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+    context.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
   const handleImageLoad = () => {
     setIsImageLoaded(true);
     performDetection();
+  };
+
+  const handleVideoLoad = () => {
+    startVideoDetection();
+  };
+
+  const handleOpenWebcam = () => {
+    handleCloseImage(); // Close the image when opening the webcam
+    clearCanvas();
+    Webcam.open(videoRef.current);
+    setIsVideoRunning(true);
+  };
+
+  const handleCloseWebcam = () => {
+    if (isVideoRunning) {
+      stopVideoDetection();
+      Webcam.close(videoRef.current);
+      setIsVideoRunning(false);
+      clearCanvas();
+    }
+  };
+
+  const handleOpenImage = () => {
+    inputImage.current.click();
+  };
+
+  const handleCloseImage = () => {
+    if (image) {
+      URL.revokeObjectURL(image);
+      setImage(null);
+      setIsImageLoaded(false);
+      clearCanvas();
+    }
+  };
+
+  const handleImageChange = (e) => {
+    handleCloseWebcam(); // Close the webcam when opening an image
+
+    if (image) {
+      URL.revokeObjectURL(image);
+      setImage(null);
+      setIsImageLoaded(false);
+    }
+
+    const url = URL.createObjectURL(e.target.files[0]);
+    imageRef.current.src = url;
+    setImage(url);
   };
 
   return (
@@ -252,13 +350,16 @@ const App = () => {
         <GridItem>
           <VStack spacing={4}>
             <Heading as="h1" size="xl">
-              Card recognition using YOLOv8
+              YOLOv8 Object Detection App
             </Heading>
+            <Text>
+              YOLOv8 object detection application live on browser powered by <code>onnxruntime-web</code>
+            </Text>
             <Text>
               Serving: <code className="code">{model}</code>
             </Text>
 
-            <Box id="image-container" position="relative" display="inline-block" p={2}>
+            <Box id="image-container" position="relative" display="inline-block" border="1px solid #ddd" borderRadius="10px" p={2}>
               <Image
                 ref={imageRef}
                 src={image}
@@ -285,47 +386,23 @@ const App = () => {
                   height: "100%",
                 }}
               />
+              <video
+                ref={videoRef}
+                style={{ display: image ? "none" : "block", width: "100%", borderRadius: "10px" }}
+                autoPlay
+                playsInline
+                muted
+                onCanPlay={handleVideoLoad}
+              />
             </Box>
 
-            <input
-              type="file"
-              ref={inputImage}
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                if (image) {
-                  URL.revokeObjectURL(image);
-                  setImage(null);
-                  setIsImageLoaded(false);
-                }
-
-                const url = URL.createObjectURL(e.target.files[0]);
-                imageRef.current.src = url;
-                setImage(url);
-              }}
-            />
+            <input type="file" ref={inputImage} accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
             <HStack spacing={4}>
-              <Button
-                onClick={() => {
-                  inputImage.current.click();
-                }}
-              >
-                Open local image
-              </Button>
-              {image && (
-                <Button
-                  onClick={() => {
-                    inputImage.current.value = "";
-                    imageRef.current.src = "#";
-                    URL.revokeObjectURL(image);
-                    setImage(null);
-                    setIsImageLoaded(false);
-                  }}
-                >
-                  Close image
-                </Button>
-              )}
+              <Button onClick={handleOpenImage}>Open local image</Button>
+              {image && <Button onClick={handleCloseImage}>Close image</Button>}
             </HStack>
+            <Button onClick={handleOpenWebcam}>Open Webcam</Button>
+            {isVideoRunning && <Button onClick={handleCloseWebcam}>Close Webcam</Button>}
           </VStack>
         </GridItem>
       </Grid>
