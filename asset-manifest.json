@@ -1,14 +1,14 @@
 {
   "files": {
-    "main.js": "/static/js/main.62507024.js",
-    "static/js/ort-wasm-simd.wasm": "/static/js/ort-wasm-simd.wasm",
-    "static/js/ort-wasm-simd-threaded.wasm": "/static/js/ort-wasm-simd-threaded.wasm",
-    "static/js/ort-wasm.wasm": "/static/js/ort-wasm.wasm",
-    "static/js/ort-wasm-threaded.wasm": "/static/js/ort-wasm-threaded.wasm",
-    "index.html": "/index.html",
-    "main.62507024.js.map": "/static/js/main.62507024.js.map"
+    "main.js": "/card_recognition_demo/static/js/main.0b06abad.js",
+    "static/js/ort-wasm-simd.wasm": "/card_recognition_demo/static/js/ort-wasm-simd.wasm",
+    "static/js/ort-wasm-simd-threaded.wasm": "/card_recognition_demo/static/js/ort-wasm-simd-threaded.wasm",
+    "static/js/ort-wasm.wasm": "/card_recognition_demo/static/js/ort-wasm.wasm",
+    "static/js/ort-wasm-threaded.wasm": "/card_recognition_demo/static/js/ort-wasm-threaded.wasm",
+    "index.html": "/card_recognition_demo/index.html",
+    "main.0b06abad.js.map": "/card_recognition_demo/static/js/main.0b06abad.js.map"
   },
   "entrypoints": [
-    "static/js/main.62507024.js"
+    "static/js/main.0b06abad.js"
   ]
 }
