@@ -1,14 +1,14 @@
 {
   "files": {
-    "main.js": "/static/js/main.14fc5271.js",
+    "main.js": "/static/js/main.62507024.js",
     "static/js/ort-wasm-simd.wasm": "/static/js/ort-wasm-simd.wasm",
     "static/js/ort-wasm-simd-threaded.wasm": "/static/js/ort-wasm-simd-threaded.wasm",
     "static/js/ort-wasm.wasm": "/static/js/ort-wasm.wasm",
     "static/js/ort-wasm-threaded.wasm": "/static/js/ort-wasm-threaded.wasm",
     "index.html": "/index.html",
-    "main.14fc5271.js.map": "/static/js/main.14fc5271.js.map"
+    "main.62507024.js.map": "/static/js/main.62507024.js.map"
   },
   "entrypoints": [
-    "static/js/main.14fc5271.js"
+    "static/js/main.62507024.js"
   ]
 }
