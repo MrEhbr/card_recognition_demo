@@ -1,0 +1,272 @@
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Image,
+  Input,
+  Select,
+  Text,
+  VStack,
+  HStack,
+  Heading,
+  FormControl,
+  FormLabel,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  Grid,
+  GridItem,
+  Spinner,
+} from "@chakra-ui/react";
+import cv from "@techstark/opencv-js";
+import { Tensor, InferenceSession } from "onnxruntime-web";
+import { detectImage } from "./utils/detect";
+import { download } from "./utils/download";
+
+const App = () => {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState({ text: "Loading OpenCV.js", progress: null });
+  const [image, setImage] = useState(null);
+  const [models, setModels] = useState([]);
+  const [model, setModel] = useState("");
+  const inputImage = useRef(null);
+  const imageRef = useRef(null);
+  const canvasRef = useRef(null);
+  const inputModel = useRef(null);
+
+  // Dynamic Configs
+  const [config, setConfig] = useState({
+    topk: 100,
+    iouThreshold: 0.45,
+    scoreThreshold: 0.25,
+  });
+
+  const modelInputShape = [1, 3, 640, 640];
+
+  const handleConfigChange = (name, value) => {
+    setConfig((prevConfig) => ({
+      ...prevConfig,
+      [name]: value,
+    }));
+  };
+
+  const handleModelChange = (e) => {
+    setModel(e.target.value);
+  };
+
+  const fetchModels = async () => {
+    let modelFiles;
+    const response = await fetch(`${process.env.PUBLIC_URL}/modelList.json`);
+    modelFiles = await response.json();
+    setModels(modelFiles);
+    if (modelFiles.length > 0) setModel(modelFiles[0]);
+  };
+
+  const loadModel = async (modelSource) => {
+    setLoading({ text: `Loading model`, progress: null });
+    let yolov8;
+    let nms;
+
+    if (modelSource instanceof File) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const buffer = e.target.result;
+        yolov8 = await InferenceSession.create(buffer);
+        const arrBufNMS = await download(`${process.env.PUBLIC_URL}/model/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
+        nms = await InferenceSession.create(arrBufNMS);
+
+        setLoading({ text: "Warming up model...", progress: null });
+        const tensor = new Tensor("float32", new Float32Array(modelInputShape.reduce((a, b) => a * b)), modelInputShape);
+        await yolov8.run({ images: tensor });
+
+        setSession({ net: yolov8, nms: nms });
+        setLoading(null);
+      };
+      reader.readAsArrayBuffer(modelSource);
+    } else {
+      const baseModelURL = `${process.env.PUBLIC_URL}/model`;
+      const arrBufNet = await download(`${baseModelURL}/${modelSource}`, [`Loading ${modelSource}`, setLoading]);
+      yolov8 = await InferenceSession.create(arrBufNet);
+      const arrBufNMS = await download(`${baseModelURL}/nms-yolov8.onnx`, ["Loading NMS model", setLoading]);
+      nms = await InferenceSession.create(arrBufNMS);
+
+      setLoading({ text: "Warming up model...", progress: null });
+      const tensor = new Tensor("float32", new Float32Array(modelInputShape.reduce((a, b) => a * b)), modelInputShape);
+      await yolov8.run({ images: tensor });
+
+      setSession({ net: yolov8, nms: nms });
+      setLoading(null);
+    }
+  };
+
+  useEffect(() => {
+    cv["onRuntimeInitialized"] = () => {
+      fetchModels();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (image && session) {
+      const img = imageRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      detectImage(
+        img,
+        canvas,
+        session,
+        config.topk,
+        config.iouThreshold,
+        config.scoreThreshold,
+        modelInputShape
+      );
+    }
+  }, [config, image, session]);
+
+  useEffect(() => {
+    if (model) {
+      loadModel(model);
+    }
+  }, [model]);
+
+  return (
+    <Box p={4}>
+      {loading && (
+        <VStack>
+          <Spinner size="xl" />
+          <Text>{loading.progress ? `${loading.text} - ${loading.progress}%` : loading.text}</Text>
+        </VStack>
+      )}
+      <Grid templateColumns="250px 1fr" gap={4}>
+        <GridItem>
+          <VStack spacing={4} align="flex-start">
+            <Heading as="h2" size="lg">Settings</Heading>
+            <FormControl>
+              <FormLabel>Top K</FormLabel>
+              <Slider
+                name="topk"
+                min={1}
+                max={100}
+                value={config.topk}
+                onChange={(val) => handleConfigChange("topk", val)}
+              >
+                <SliderTrack>
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb />
+              </Slider>
+              <Text>{config.topk}</Text>
+            </FormControl>
+            <FormControl>
+              <FormLabel>IoU Threshold</FormLabel>
+              <Slider
+                name="iouThreshold"
+                min={0}
+                max={1}
+                step={0.01}
+                value={config.iouThreshold}
+                onChange={(val) => handleConfigChange("iouThreshold", val)}
+              >
+                <SliderTrack>
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb />
+              </Slider>
+              <Text>{config.iouThreshold}</Text>
+            </FormControl>
+            <FormControl>
+              <FormLabel>Score Threshold</FormLabel>
+              <Slider
+                name="scoreThreshold"
+                min={0}
+                max={1}
+                step={0.01}
+                value={config.scoreThreshold}
+                onChange={(val) => handleConfigChange("scoreThreshold", val)}
+              >
+                <SliderTrack>
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb />
+              </Slider>
+              <Text>{config.scoreThreshold}</Text>
+            </FormControl>
+            <FormControl>
+              <FormLabel>Model</FormLabel>
+              <Select name="model" value={model} onChange={handleModelChange}>
+                {models.map((modelName) => (
+                  <option key={modelName} value={modelName}>{modelName}</option>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl>
+              <FormLabel>Upload Model</FormLabel>
+              <Input type="file" ref={inputModel} accept=".onnx" onChange={(e) => loadModel(e.target.files[0])} />
+            </FormControl>
+          </VStack>
+        </GridItem>
+        <GridItem>
+          <VStack spacing={4}>
+            <Heading as="h1" size="xl">YOLOv8 Object Detection App</Heading>
+            <Text>YOLOv8 object detection application live on browser powered by <code>onnxruntime-web</code></Text>
+            <Text>Serving : <code className="code">{model}</code></Text>
+
+            <Box id="image-container">
+              <Image
+                ref={imageRef}
+                src="#"
+                alt=""
+                display={image ? "block" : "none"}
+                onLoad={() => {
+                  detectImage(imageRef.current, canvasRef.current, session, config.topk, config.iouThreshold, config.scoreThreshold, modelInputShape);
+                }}
+              />
+              <canvas id="canvas" ref={canvasRef} style={{ width: "100%", height: "100%" }} />
+            </Box>
+
+            <input
+              type="file"
+              ref={inputImage}
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                if (image) {
+                  URL.revokeObjectURL(image);
+                  setImage(null);
+                }
+
+                const url = URL.createObjectURL(e.target.files[0]);
+                imageRef.current.src = url;
+                setImage(url);
+              }}
+            />
+            <HStack spacing={4}>
+              <Button
+                onClick={() => {
+                  inputImage.current.click();
+                }}
+              >
+                Open local image
+              </Button>
+              {image && (
+                <Button
+                  onClick={() => {
+                    inputImage.current.value = "";
+                    imageRef.current.src = "#";
+                    URL.revokeObjectURL(image);
+                    setImage(null);
+                  }}
+                >
+                  Close image
+                </Button>
+              )}
+            </HStack>
+          </VStack>
+        </GridItem>
+      </Grid>
+    </Box>
+  );
+};
+
+export default App;

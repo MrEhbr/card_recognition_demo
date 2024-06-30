@@ -1,0 +1,38 @@
+{
+	"name": "card_recognition_demo",
+	"version": "0.1.0",
+	"dependencies": {
+		"@chakra-ui/react": "^2.8.2",
+		"@emotion/react": "^11.11.4",
+		"@emotion/styled": "^11.11.5",
+		"@techstark/opencv-js": "4.5.5-release.2",
+		"framer-motion": "^11.2.12",
+		"lodash": "^4.17.21",
+		"onnxruntime-web": "^1.13.1",
+		"react": "^18.2.0",
+		"react-dom": "^18.2.0",
+		"react-scripts": "5.0.1"
+	},
+	"scripts": {
+		"start": "node generateModelsList.js && craco start --static-serve-index",
+		"build": "node generateModelsList.js && craco build",
+		"deploy": "node generateModelsList.js && gh-pages -d build"
+	},
+	"eslintConfig": {
+		"extends": ["react-app", "react-app/jest"]
+	},
+	"browserslist": {
+		"production": [">0.2%", "not dead", "not op_mini all"],
+		"development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/MrEhbr/card_recognition_demo.git"
+	},
+	"devDependencies": {
+		"@craco/craco": "^7.0.0",
+		"copy-webpack-plugin": "^11.0.0",
+		"gh-pages": "^4.0.0"
+	}
+}
